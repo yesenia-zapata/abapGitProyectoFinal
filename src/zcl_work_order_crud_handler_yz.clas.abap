@@ -15,7 +15,9 @@ CLASS zcl_work_order_crud_handler_yz DEFINITION
 
       update_work_order
         IMPORTING is_data TYPE zworkorder_ot
-        RETURNING VALUE(rv_msg) TYPE string,
+        RETURNING VALUE(rv_msg) TYPE string
+        RAISING
+          cx_abap_lock_failure,
 
       delete_work_order
         IMPORTING iv_id TYPE n
@@ -62,20 +64,46 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
       ENDMETHOD.
 
       METHOD update_work_order.
-        IF NEW zcl_work_order_validator_yz( )->validate_update_order(
-               iv_work_order_id = is_data-work_order_id
-               iv_status        = is_data-status ).
-          UPDATE zworkorder_ot FROM @is_data.
 
-          INSERT zworder_hist_ot FROM @( VALUE #(
-              history_id         = cl_abap_context_info=>get_system_time( )
-              work_order_id      = is_data-work_order_id
-              modification_date  = cl_abap_context_info=>get_system_date( )
-              change_description = 'Actualización técnica' ) ).
+        DATA: lo_lock TYPE REF TO if_abap_lock_object.
 
-          rv_msg = 'Orden actualizada e historial registrado'.
+            TRY.
+                " Instanciar el objeto de bloque
+                lo_lock = cl_abap_lock_object_factory=>get_instance( iv_name = 'EZWORKORDER_YZ' ).
+
+                "Intentar bloquear la orden de trabajo específica
+                lo_lock->enqueue(
+                    it_parameter = VALUE #( (  name = 'WORK_ORDER_ID' value = REF #( is_data-work_order_id ) ) )
+                ).
+
+              CATCH cx_abap_foreign_lock.
+                rv_msg = 'ERROR: La orden está bloqueada por otro usuario'.
+                RETURN.
+              CATCH cx_abap_lock_failure.
+                rv_msg = 'ERROR: Fallo al intentar bloquear'.
+                RETURN.
+            ENDTRY.
+
+            "Si llegamos aquí, el bloqueo es exitoso. Procedemos a validar y actualizar
+            IF NEW zcl_work_order_validator_yz( )->validate_update_order(
+                   iv_work_order_id = is_data-work_order_id
+                   iv_status        = is_data-status ).
+
+              UPDATE zworkorder_ot FROM @is_data.
+
+              INSERT zworder_hist_ot FROM @( VALUE #(
+                  history_id         = cl_abap_context_info=>get_system_time( )
+                  work_order_id      = is_data-work_order_id
+                  modification_date  = cl_abap_context_info=>get_system_date( )
+                  change_description = 'Actualización técnica' ) ).
+
+              rv_msg = 'Orden actualizada e historial registrado'.
 
         ENDIF.
+        "Liberar el bloqueo al terminar
+        lo_lock->dequeue(
+            it_parameter = VALUE #( (  name = 'WORK_ORDER_ID' value = REF #( is_data-work_order_id ) ) )
+        ).
 
       ENDMETHOD.
 
