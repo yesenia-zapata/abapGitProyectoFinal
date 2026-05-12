@@ -21,25 +21,37 @@ CLASS zcl_work_order_crud_handler_yz DEFINITION
 
       delete_work_order
         IMPORTING iv_id TYPE n
-        RETURNING VALUE(rv_msg) TYPE string.
+        RETURNING VALUE(rv_msg) TYPE string
+        RAISING
+          cx_abap_lock_failure.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+    METHODS:
+      check_authority
+        IMPORTING iv_actvt        TYPE c
+        RETURNING VALUE(rv_auth) TYPE abap_bool.
+
 ENDCLASS.
 
 
 
 CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
 
+    METHOD check_authority.
+        " Centralización de la verificación de permisos según el rol
+        AUTHORITY-CHECK OBJECT 'ZOT_AUT_YZ'
+          ID 'ACTVT' FIELD iv_actvt.
+        rv_auth = cond #( when sy-subrc = 0 then abap_true else abap_false ).
+      ENDMETHOD.
+
     METHOD create_work_order.
 
-        AUTHORITY-CHECK OBJECT 'ZOT_AUT_YZ'
-             ID 'ACTVT' FIELD '01'.
-
-        IF sy-subrc <> 0.
-          rv_msg = 'Sin autorización para crear'.
-          RETURN.
-        ENDIF.
+        " Autorización para Crear (01)
+            IF check_authority( '01' ) = abap_false.
+              rv_msg = 'ERROR: Sin autorización para crear órdenes'.
+              RETURN.
+            ENDIF.
 
         " Pasamos los campos directamente respetando sus tipos técnicos
         IF NEW zcl_work_order_validator_yz( )->validate_create_order(
@@ -48,22 +60,35 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
                iv_priority      = is_data-priority ).
           INSERT zworkorder_ot FROM @is_data.
 
-          rv_msg = 'Orden creada'.
-
+             rv_msg = 'Orden creada'.
+        ELSE.
+              rv_msg = 'ERROR: Datos maestros inválidos o faltantes'.
         ENDIF.
 
       ENDMETHOD.
 
       METHOD read_work_order.
 
-        SELECT SINGLE *
-        FROM zworkorder_ot
-        WHERE work_order_id = @iv_id
-            INTO @rs_data.
+          " Autorización para Visualizar (03)
+        IF check_authority( '03' ) = abap_true.
+
+            SELECT SINGLE *
+            FROM zworkorder_ot
+            WHERE work_order_id = @iv_id
+                INTO @rs_data.
+
+        ENDIF.
 
       ENDMETHOD.
 
       METHOD update_work_order.
+
+         " Autorización para Cambiar (02)
+        IF check_authority( '02' ) = abap_false.
+          rv_msg = 'ERROR: Sin autorización para actualizar'.
+          RETURN.
+        ENDIF.
+
 
         DATA: lo_lock TYPE REF TO if_abap_lock_object.
 
@@ -109,6 +134,23 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
 
       METHOD delete_work_order.
 
+        "Autorización para Borrar (06)
+        IF check_authority( '06' ) = abap_false.
+          rv_msg = 'ERROR: Sin autorización para eliminar'.
+          RETURN.
+        ENDIF.
+
+        DATA: lo_lock TYPE REF TO if_abap_lock_object.
+
+        TRY.
+              lo_lock = cl_abap_lock_object_factory=>get_instance( iv_name = 'EZWORKORDER_YZ' ).
+              lo_lock->enqueue( it_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( iv_id ) ) ) ).
+        CATCH cx_abap_foreign_lock.
+              rv_msg = 'ERROR: No se puede eliminar, la orden está en uso'.
+              RETURN.
+        ENDTRY.
+
+         " Obtenemos el estado actual bajo bloqueo para validar
         SELECT SINGLE status
         FROM zworkorder_ot
         WHERE work_order_id = @iv_id
@@ -123,6 +165,8 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
         ELSE.
           rv_msg = 'No se puede eliminar: tiene historial o no está pendiente'.
         ENDIF.
+
+        lo_lock->dequeue( it_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( iv_id ) ) ) ).
 
       ENDMETHOD.
 
