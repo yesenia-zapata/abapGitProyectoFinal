@@ -36,7 +36,7 @@ CLASS zcl_work_order_crud_test_yz IMPLEMENTATION.
     TRY.
         test_create_work_order( out ).
         test_read_work_order( out ).
-        "test_update_work_order( out ).
+        test_update_work_order( out ).
         test_delete_work_order( out ).
 
       CATCH cx_root INTO DATA(lx_root).
