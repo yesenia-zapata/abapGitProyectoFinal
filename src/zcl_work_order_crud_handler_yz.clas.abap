@@ -6,23 +6,29 @@ CLASS zcl_work_order_crud_handler_yz DEFINITION
   PUBLIC SECTION.
   METHODS:
       create_work_order
-           IMPORTING
+       IMPORTING
                  is_data TYPE zworkorder_ot
                  iv_bypass_auth TYPE abap_bool DEFAULT abap_false
        RETURNING VALUE(rv_msg) TYPE string,
 
-      read_work_order
-          IMPORTING iv_id TYPE n
-          RETURNING VALUE(rs_data) TYPE zworkorder_ot,
+    read_work_order
+        IMPORTING
+                  iv_id TYPE n
+                  iv_bypass_auth TYPE abap_bool DEFAULT abap_false
+        RETURNING VALUE(rs_data) TYPE zworkorder_ot,
 
       update_work_order
-        IMPORTING is_data TYPE zworkorder_ot
+        IMPORTING
+                 is_data TYPE zworkorder_ot
+                 iv_bypass_auth TYPE abap_bool DEFAULT abap_false
         RETURNING VALUE(rv_msg) TYPE string
         RAISING
           cx_abap_lock_failure,
 
       delete_work_order
-        IMPORTING iv_id TYPE n
+        IMPORTING
+                  iv_id TYPE n
+                  iv_bypass_auth TYPE abap_bool DEFAULT abap_false
         RETURNING VALUE(rv_msg) TYPE string
         RAISING
           cx_abap_lock_failure.
@@ -41,11 +47,6 @@ ENDCLASS.
 CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
 
     METHOD check_authority.
-        "Si estamos en un Unit Test, saltamos la validación física
-       IF cl_abap_unit_assert=>assert_true( act = abap_true ) IS INITIAL.
-          rv_auth = abap_true.
-          RETURN.
-        ENDIF.
 
         "Verificación real de permisos según el requerimiento
         AUTHORITY-CHECK OBJECT 'ZOT_AUT_YZ'
@@ -60,10 +61,10 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
     METHOD create_work_order.
 
         " Autorización para Crear (01)
-            IF check_authority( '01' ) = abap_false.
-              rv_msg = 'ERROR: Sin autorización para crear órdenes'.
-              RETURN.
-            ENDIF.
+          IF iv_bypass_auth = abap_false AND check_authority( '01' ) = abap_false.
+            rv_msg = 'ERROR: Sin autorización para crear órdenes'.
+            RETURN.
+          ENDIF.
 
         " Pasamos los campos directamente respetando sus tipos técnicos
         IF NEW zcl_work_order_validator_yz( )->validate_create_order(
@@ -82,24 +83,24 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
       METHOD read_work_order.
 
           " Autorización para Visualizar (03)
-        IF check_authority( '03' ) = abap_true.
+          IF iv_bypass_auth = abap_false AND check_authority( '03' ) = abap_false.
+            RETURN.
+          ENDIF.
 
             SELECT SINGLE *
             FROM zworkorder_ot
             WHERE work_order_id = @iv_id
                 INTO @rs_data.
 
-        ENDIF.
-
       ENDMETHOD.
 
       METHOD update_work_order.
 
          " Autorización para Cambiar (02)
-        IF check_authority( '02' ) = abap_false.
-          rv_msg = 'ERROR: Sin autorización para actualizar'.
-          RETURN.
-        ENDIF.
+          IF iv_bypass_auth = abap_false AND check_authority( '02' ) = abap_false.
+            rv_msg = 'ERROR: Sin autorización para crear órdenes'.
+            RETURN.
+          ENDIF.
 
 
         "DATA: lo_lock TYPE REF TO if_abap_lock_object.
@@ -148,10 +149,12 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
       METHOD delete_work_order.
 
         "Autorización para Borrar (06)
-        IF check_authority( '06' ) = abap_false.
-          rv_msg = 'ERROR: Sin autorización para eliminar'.
-          RETURN.
-        ENDIF.
+
+          IF iv_bypass_auth = abap_false AND check_authority( '06' ) = abap_false.
+            rv_msg = 'ERROR: Sin autorización para crear órdenes'.
+            RETURN.
+          ENDIF.
+
 
         "DATA: lo_lock TYPE REF TO if_abap_lock_object,
        " lv_id   TYPE zworkorder_ot-work_order_id.
