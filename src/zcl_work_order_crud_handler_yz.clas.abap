@@ -84,6 +84,7 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
 
           " Autorización para Visualizar (03)
           IF iv_bypass_auth = abap_false AND check_authority( '03' ) = abap_false.
+            CLEAR rs_data.
             RETURN.
           ENDIF.
 
@@ -97,7 +98,9 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
       METHOD update_work_order.
 
 
-          DATA: lo_lock TYPE REF TO if_abap_lock_object.
+          "DATA: lo_lock TYPE REF TO if_abap_lock_object.
+          "DATA lt_parameter TYPE if_abap_lock_object=>tt_parameter.
+          "DATA lv_work_order_id TYPE zworkorder_ot-work_order_id.
           DATA lv_current_status TYPE zde_status_yz.
 
          " Autorización para Cambiar (02)
@@ -106,14 +109,21 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
             RETURN.
           ENDIF.
 
-
+            "lv_work_order_id = is_data-work_order_id.
 
             TRY.
                 " Instanciar el objeto de bloque
-                lo_lock = cl_abap_lock_object_factory=>get_instance( iv_name = 'EZWORKORDER_YZ' ).
+                "lo_lock = cl_abap_lock_object_factory=>get_instance( iv_name = 'EZWORKORDER_YZ' ).
 
                 "Intentar bloquear la orden de trabajo específica
-                 lo_lock->enqueue( it_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( is_data-work_order_id ) ) ) ).
+                "lt_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( lv_work_order_id  ) ) ) .
+
+                " Bloqueo técnico definido en EZWORKORDER_YZ.
+                " La integración programática fue probada con la API de lock objects en ABAP Cloud,
+                " pero el entorno provoca un runtime interno del framework al ejecutar enqueue.
+                " Se deja documentado como limitación técnica del entorno.
+                 "lo_lock->enqueue( it_parameter = lt_parameter ).
+
 
                 " Leer el estado actual  para validar
 
@@ -141,7 +151,7 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
 
                 ENDIF.
                 "Liberar el bloqueo al terminar
-                lo_lock->dequeue( it_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( is_data-work_order_id ) ) ) ).
+                "lo_lock->dequeue( it_parameter = lt_parameter ).
 
             CATCH cx_abap_foreign_lock.
               rv_msg = 'ERROR: La orden está bloqueada por otro usuario'.
@@ -160,7 +170,7 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
 
       METHOD delete_work_order.
 
-      DATA lo_lock TYPE REF TO if_abap_lock_object.
+      "DATA lo_lock TYPE REF TO if_abap_lock_object.
       DATA lv_stat TYPE zde_status_yz.
 
         "Autorización para Borrar (06)
@@ -171,8 +181,8 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
           ENDIF.
 
         TRY.
-              lo_lock = cl_abap_lock_object_factory=>get_instance( iv_name = 'EZWORKORDER_YZ' ).
-              lo_lock->enqueue( it_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( iv_id ) ) ) ).
+              "lo_lock = cl_abap_lock_object_factory=>get_instance( iv_name = 'EZWORKORDER_YZ' ).
+              "lo_lock->enqueue( it_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( iv_id ) ) ) ).
 
                  " Obtenemos el estado actual bajo bloqueo para validar
                 SELECT SINGLE status
@@ -190,7 +200,7 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
                   rv_msg = 'No se puede eliminar: tiene historial o no está pendiente'.
                 ENDIF.
 
-                lo_lock->dequeue( it_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( iv_id ) ) ) ).
+                "lo_lock->dequeue( it_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( iv_id ) ) ) ).
 
         CATCH cx_abap_foreign_lock.
           rv_msg = 'ERROR: La orden está bloqueada por otro usuario'.
