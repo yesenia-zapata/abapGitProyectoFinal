@@ -96,27 +96,36 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
 
       METHOD update_work_order.
 
+
+          DATA: lo_lock TYPE REF TO if_abap_lock_object.
+          DATA lv_current_status TYPE zde_status_yz.
+
          " Autorización para Cambiar (02)
           IF iv_bypass_auth = abap_false AND check_authority( '02' ) = abap_false.
-            rv_msg = 'ERROR: Sin autorización para crear órdenes'.
+            rv_msg = 'ERROR: Sin autorización para actualizar órdenes'.
             RETURN.
           ENDIF.
 
 
-        "DATA: lo_lock TYPE REF TO if_abap_lock_object.
 
             TRY.
                 " Instanciar el objeto de bloque
-                "lo_lock = cl_abap_lock_object_factory=>get_instance( iv_name = 'EZWORKORDER_YZ' ).
+                lo_lock = cl_abap_lock_object_factory=>get_instance( iv_name = 'EZWORKORDER_YZ' ).
 
                 "Intentar bloquear la orden de trabajo específica
-                "lo_lock->enqueue(it_parameter = VALUE #( (  name = 'WORK_ORDER_ID' value = REF #( is_data-work_order_id ) ) )).
+                 lo_lock->enqueue( it_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( is_data-work_order_id ) ) ) ).
 
+                " Leer el estado actual  para validar
+
+                SELECT SINGLE status
+                  FROM zworkorder_ot
+                  WHERE work_order_id = @is_data-work_order_id
+                  INTO @lv_current_status.
 
                 "Si llegamos aquí, el bloqueo es exitoso. Procedemos a validar y actualizar
                 IF NEW zcl_work_order_validator_yz( )->validate_update_order(
                        iv_work_order_id = is_data-work_order_id
-                       iv_status        = is_data-status ).
+                       iv_status        = lv_current_status  ).
 
                   UPDATE zworkorder_ot FROM @is_data.
 
@@ -132,43 +141,44 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
 
                 ENDIF.
                 "Liberar el bloqueo al terminar
-                "lo_lock->dequeue(it_parameter = VALUE #( (  name = 'WORK_ORDER_ID' value = REF #( is_data-work_order_id ) ) )).
+                lo_lock->dequeue( it_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( is_data-work_order_id ) ) ) ).
 
-              CATCH cx_abap_foreign_lock.
-                rv_msg = 'ERROR: La orden está bloqueada por otro usuario'.
-                RETURN.
-              CATCH cx_abap_lock_failure.
-                rv_msg = 'ERROR: Fallo al intentar bloquear'.
-                RETURN.
-              CATCH cx_root INTO DATA(lx_error).
-                    rv_msg = |ERROR INESPERADO: { lx_error->get_text( ) }|.
-            ENDTRY.
+            CATCH cx_abap_foreign_lock.
+              rv_msg = 'ERROR: La orden está bloqueada por otro usuario'.
+              RETURN.
+
+            CATCH cx_abap_lock_failure.
+              rv_msg = 'ERROR: Fallo técnico al intentar bloquear'.
+              RETURN.
+
+            CATCH cx_root INTO DATA(lx_error).
+              rv_msg = |ERROR INESPERADO: { lx_error->get_text( ) }|.
+              RETURN.
+          ENDTRY.
 
       ENDMETHOD.
 
       METHOD delete_work_order.
 
+      DATA lo_lock TYPE REF TO if_abap_lock_object.
+      DATA lv_stat TYPE zde_status_yz.
+
         "Autorización para Borrar (06)
 
           IF iv_bypass_auth = abap_false AND check_authority( '06' ) = abap_false.
-            rv_msg = 'ERROR: Sin autorización para crear órdenes'.
+            rv_msg = 'ERROR: Sin autorización para eliminar órdenes'.
             RETURN.
           ENDIF.
 
-
-        "DATA: lo_lock TYPE REF TO if_abap_lock_object,
-       " lv_id   TYPE zworkorder_ot-work_order_id.
-        "lv_id = iv_id..
-
         TRY.
-             " lo_lock = cl_abap_lock_object_factory=>get_instance( iv_name = 'EZWORKORDER_YZ' ).
-              "lo_lock->enqueue( it_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( lv_id ) ) ) ).
+              lo_lock = cl_abap_lock_object_factory=>get_instance( iv_name = 'EZWORKORDER_YZ' ).
+              lo_lock->enqueue( it_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( iv_id ) ) ) ).
 
                  " Obtenemos el estado actual bajo bloqueo para validar
                 SELECT SINGLE status
                 FROM zworkorder_ot
                 WHERE work_order_id = @iv_id
-                    INTO @DATA(lv_stat).
+                    INTO @lv_stat.
 
                 IF NEW zcl_work_order_validator_yz( )->validate_delete_order(
                        iv_work_order_id = iv_id
@@ -180,13 +190,21 @@ CLASS zcl_work_order_crud_handler_yz IMPLEMENTATION.
                   rv_msg = 'No se puede eliminar: tiene historial o no está pendiente'.
                 ENDIF.
 
-                "lo_lock->dequeue( it_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( lv_id ) ) ) ).
+                lo_lock->dequeue( it_parameter = VALUE #( ( name = 'WORK_ORDER_ID' value = REF #( iv_id ) ) ) ).
 
-       CATCH cx_abap_foreign_lock.
-        rv_msg = 'Orden bloqueada por otro usuario'.
-    CATCH cx_abap_lock_failure.
-        rv_msg = 'Error técnico al intentar bloquear'.
-    ENDTRY.
+        CATCH cx_abap_foreign_lock.
+          rv_msg = 'ERROR: La orden está bloqueada por otro usuario'.
+          RETURN.
+
+        CATCH cx_abap_lock_failure.
+          rv_msg = 'ERROR: Fallo técnico al intentar bloquear'.
+          RETURN.
+
+        CATCH cx_root INTO DATA(lx_error).
+          rv_msg = |ERROR INESPERADO: { lx_error->get_text( ) }|.
+          RETURN.
+      ENDTRY.
+
 
       ENDMETHOD.
 
