@@ -228,47 +228,6 @@ Flujo cubierto:
 
 ---
 
-## 📁 Estructura del repositorio
-
-```text
-/
-├── .abapgit.xml
-├── README.md
-└── src/
-    ├── ezworkorder_yz.enqu.xml
-    ├── package.devc.xml
-    ├── zcl_load_master_data_yz.clas.abap
-    ├── zcl_load_master_data_yz.clas.xml
-    ├── zcl_work_order_crud_handler_yz.clas.abap
-    ├── zcl_work_order_crud_handler_yz.clas.xml
-    ├── zcl_work_order_crud_test_yz.clas.abap
-    ├── zcl_work_order_crud_test_yz.clas.testclasses.abap
-    ├── zcl_work_order_crud_test_yz.clas.xml
-    ├── zcl_work_order_validator_yz.clas.abap
-    ├── zcl_work_order_validator_yz.clas.xml
-    ├── zcustomer_ot.tabl.xml
-    ├── zde_customer_id_yz.dtel.xml
-    ├── zde_priority_yz.dtel.xml
-    ├── zde_status_yz.dtel.xml
-    ├── zde_technician_id_yz.dtel.xml
-    ├── zde_workorder_id.dtel.xml
-    ├── zdo_customer_id.doma.xml
-    ├── zdo_priority_yz.doma.xml
-    ├── zdo_status_yz.doma.xml
-    ├── zdo_technician_id.doma.xml
-    ├── zdo_workorder_id.doma.xml
-    ├── zot_aut_yz.sia3.xml
-    ├── zot_aut_yz.suso.xml
-    ├── ztechnician_ot.tabl.xml
-    ├── zwo_crud_catalog.sia1.xml
-    ├── zwo_crud_catalog_0001.sia7.xml
-    ├── zwo_crud_iam_app_yz_ext.sia6.xml
-    ├── zworder_hist_ot.tabl.xml
-    └── zworkorder_ot.tabl.xml
-```
-
----
-
 ## 🚀 Tecnologías utilizadas
 
 - **ABAP Cloud**
@@ -276,21 +235,6 @@ Flujo cubierto:
 - **abapGit**
 - objetos de autorización/IAM
 - clases ABAP orientadas a lógica de negocio
-
----
-
-## 📌 Estado actual
-
-El proyecto actualmente cuenta con:
-
-- modelo de datos definido
-- estructuras de diccionario completas
-- lógica CRUD principal
-- validaciones funcionales
-- control de autorizaciones
-- historial de cambios
-- clases de prueba
-- carga de datos maestros
 
 ---
 
